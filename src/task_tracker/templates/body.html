@@ -1,0 +1,28 @@
+{{define "body"}}
+<!DOCTYPE html>
+<html>
+<head>
+    {{template "firebase"}}
+    <script src="/static/js/jquery-3.0.0.min.js"></script>
+    <script src="/static/js/js.cookie.js"></script>
+    <script src="/static/js/base.js"></script>
+    <title>Task Tracker</title>
+</head>
+<body>
+Stuff goes here
+{{if .User}}
+<p>A user {{.User}}</p>
+{{else}}
+<p>No user</p>
+{{end}}
+<div id="logged_out" style="display: none;">
+    You are logged out. Click a button
+    <button class="login" id="google-login">Login with Google</button>
+
+</div>
+<div>
+
+</div>
+</body>
+</html>
+{{end}}
