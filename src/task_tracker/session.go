@@ -10,6 +10,7 @@ import (
 
 type TaskTrackerUser struct {
 	Email string
+	UserId string
 }
 
 func init() {
@@ -24,11 +25,13 @@ func UserForToken(ctx appengine.Context, token *jwt.Token) (*TaskTrackerUser, er
 	ctx.Debugf("Stuff: %v", token.Claims)
 	return &TaskTrackerUser{
 		Email: token.Claims["email"].(string),
+		UserId: token.Claims["user_id"].(string),
 	}, nil
 }
 
 func NewSession(token *jwt.Token, w http.ResponseWriter, req *http.Request) (*sessions.Session, error) {
 	ctx := appengine.NewContext(req)
+	ctx.Debugf("Claims: %v", token.Claims)
 	user, err := UserForToken(ctx, token)
 	if err != nil {
 		return nil, err
@@ -52,5 +55,9 @@ func UserForRequest(req *http.Request) (*TaskTrackerUser, error) {
 		return nil, err
 	}
 	val := session.Values[userKey]
-	return val.(*TaskTrackerUser), nil
+	user, ok := val.(*TaskTrackerUser)
+	if !ok {
+		return nil, nil
+	}
+	return user, nil
 }

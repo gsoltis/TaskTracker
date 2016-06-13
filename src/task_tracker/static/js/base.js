@@ -7,7 +7,9 @@ $(document).ready(function() {
             console.log('got a user');
             console.log(user);
             var needsLogin = false;
-            if (!user_) {
+            if (!user_ && !Cookies.get('_s')) {
+                var cookie = Cookies.get('_s');
+                console.log(cookie);
                 needsLogin = true;
             }
             user_ = user;
