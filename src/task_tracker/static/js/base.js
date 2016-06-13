@@ -4,12 +4,8 @@ $(document).ready(function() {
     var authToken_;
     auth.onAuthStateChanged(function(user) {
         if (user) {
-            console.log('got a user');
-            console.log(user);
             var needsLogin = false;
             if (!user_ && !Cookies.get('_s')) {
-                var cookie = Cookies.get('_s');
-                console.log(cookie);
                 needsLogin = true;
             }
             user_ = user;
@@ -23,9 +19,12 @@ $(document).ready(function() {
                         method: 'POST'
                     }).done(function() {
                         console.log('succeeded');
+                        showLoggedIn();
                     }).fail(function(jq, status, error) {
                         console.log('Failed', status, error);
                     });
+                } else {
+                    showLoggedIn();
                 }
                 //Cookies.set('gtoken', token);
             }).catch(function(err) {
@@ -39,7 +38,8 @@ $(document).ready(function() {
     });
 
     function showLogin() {
-        $('#logged_out').toggle();
+        $('#logged_out').show();
+        $('#logged_in').hide();
         $('#google-login').click(function(e) {
             e.preventDefault();
             $('.login').prop('disabled', true);
@@ -52,9 +52,53 @@ $(document).ready(function() {
             });
         });
     }
-    
+
     function showLoggedIn() {
-        
+        $('#logged_out').hide();
+        $('#logged_in').show();
+        $('#add-task').prop('disabled', true);
+        $.ajax("/api/tasks").done(function(tasks) {
+            console.log("tasks", tasks);
+            tasks_ = tasks;
+            renderTasks();
+            $('#add-task').prop('disabled', false);
+        }).fail(function(jq, status, error) {
+            console.log('Failed to get tasks', status, error);
+        });
     }
+
+    var tasks_ = {};
+
+    var addTask = function(task_key, task) {
+        var li = $('<li class="task" id="' + task_key + '">' + task['Name'] + '</li>');
+        $('#task-list').append(li);
+    };
+
+    function renderTasks() {
+        for (var task_key in tasks_) {
+            if (tasks_.hasOwnProperty(task_key)) {
+                addTask(task_key, tasks_[task_key]);
+            }
+        }
+    }
+
+    $('#task-submit').click(function(e) {
+        e.preventDefault();
+        $('#add-task').prop('disabled', true);
+        var task_name = $('#task-name').val();
+        if (!task_name) {
+            return;
+        }
+        $.ajax("/api/tasks", {
+            method: 'POST',
+            data: task_name
+        }).done(function(task_key) {
+            console.log('Set task: ' + task_key);
+            addTask(task_key, { Name: task_name });
+            $('#task-name').val('');
+            $('#add-task').prop('disabled', false);
+        }).fail(function(jq, status, error) {
+            console.log("failed", status, error);
+        });
+    })
 });
-var provider = new firebase.auth.GoogleAuthProvider();

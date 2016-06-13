@@ -9,19 +9,18 @@
     <title>Task Tracker</title>
 </head>
 <body>
-Stuff goes here
-{{if .User}}
-<p>A user {{.User}}</p>
-{{else}}
-<p>No user</p>
-{{end}}
 <div id="logged_out" style="display: none;">
     You are logged out. Click a button
     <button class="login" id="google-login">Login with Google</button>
 
 </div>
-<div>
-
+<div id="logged_in" style="display: none;">
+    <h4>Your tasks:</h4>
+    <ul id="task-list"></ul>
+    <div id="add-task">
+        <input type="text" id="task-name" />
+        <input type="submit" id="task-submit" value="Add A Task">
+    </div>
 </div>
 </body>
 </html>

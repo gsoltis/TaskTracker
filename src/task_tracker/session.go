@@ -6,11 +6,16 @@ import (
 	"net/http"
 	"appengine"
 	"encoding/gob"
+	"appengine/datastore"
 )
 
 type TaskTrackerUser struct {
 	Email string
 	UserId string
+}
+
+func (u *TaskTrackerUser) Key(ctx appengine.Context) *datastore.Key {
+	return datastore.NewKey(ctx, "User", u.UserId, 0, nil)
 }
 
 func init() {
@@ -23,10 +28,29 @@ const sessionName = "_s"
 
 func UserForToken(ctx appengine.Context, token *jwt.Token) (*TaskTrackerUser, error) {
 	ctx.Debugf("Stuff: %v", token.Claims)
-	return &TaskTrackerUser{
-		Email: token.Claims["email"].(string),
-		UserId: token.Claims["user_id"].(string),
-	}, nil
+	user_id := token.Claims["user_id"].(string)
+	user_key := datastore.NewKey(ctx, "User", user_id, 0, nil)
+	var user = &TaskTrackerUser{}
+	err := datastore.Get(ctx, user_key, user)
+	if err == datastore.ErrNoSuchEntity {
+		user := &TaskTrackerUser{
+			Email: token.Claims["email"].(string),
+			UserId: user_id,
+		}
+		ctx.Debugf("Setting %v", user)
+		key, err := datastore.Put(ctx, user_key, user)
+		ctx.Debugf("Put? %v / %v", err, key)
+	} else if err != nil {
+		ctx.Debugf("ERrr: %v", err)
+		return nil, err
+	} else {
+		token_email := token.Claims["email"].(string)
+		if user.Email != token_email {
+			user.Email = token_email
+			datastore.Put(ctx, user_key, user)
+		}
+	}
+	return user, nil
 }
 
 func NewSession(token *jwt.Token, w http.ResponseWriter, req *http.Request) (*sessions.Session, error) {
