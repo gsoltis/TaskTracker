@@ -1,17 +1,21 @@
 package task_tracker
 
 import (
+	"github.com/gorilla/mux"
 	"net/http"
 	"html/template"
 	"appengine"
 	"fmt"
 )
 
-type TaskTrackerUser struct {}
+
 
 func init() {
-	http.HandleFunc("/_ah/start", startup)
-	http.Handle("/", authMiddleware(root))
+	r := mux.NewRouter()
+	r.HandleFunc("/_ah/start", startup)
+	r.HandleFunc("/login", authRequest)
+	r.HandleFunc("/", root)
+	http.Handle("/", r)
 }
 
 func startup(w http.ResponseWriter, req *http.Request) {
@@ -26,18 +30,6 @@ func startup(w http.ResponseWriter, req *http.Request) {
 
 type UserAwareHttpHandler func(*TaskTrackerUser, http.ResponseWriter, *http.Request)
 
-func authMiddleware(next UserAwareHttpHandler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		user, err := authRequest(w, r)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		} else {
-			appengine.NewContext(r).Debugf("User? %v", user)
-			next(user, w, r)
-		}
-	})
-}
-
 var templates = template.Must(template.ParseGlob("templates/*"))
 
 
@@ -46,7 +38,11 @@ type MainPage struct {
 	User *TaskTrackerUser
 }
 
-func root(user *TaskTrackerUser, w http.ResponseWriter, req *http.Request) {
+func root(w http.ResponseWriter, req *http.Request) {
+	user, err := UserForRequest(req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 	mp := MainPage{
 		User: user,
 	}

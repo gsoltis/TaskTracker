@@ -6,11 +6,26 @@ $(document).ready(function() {
         if (user) {
             console.log('got a user');
             console.log(user);
+            var needsLogin = false;
+            if (!user_) {
+                needsLogin = true;
+            }
             user_ = user;
             user_.getToken().then(function(token) {
                 authToken_ = token;
                 console.log(token);
-                Cookies.set('gtoken', token);
+                if (needsLogin) {
+                    console.log('Posting now...');
+                    $.ajax("/login", {
+                        data: token,
+                        method: 'POST'
+                    }).done(function() {
+                        console.log('succeeded');
+                    }).fail(function(jq, status, error) {
+                        console.log('Failed', status, error);
+                    });
+                }
+                //Cookies.set('gtoken', token);
             }).catch(function(err) {
                 console.error('Failed to get token');
                 console.log(err);

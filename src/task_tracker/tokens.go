@@ -100,31 +100,33 @@ func (kc *KeyCache) GetKey(kid string) *rsa.PublicKey {
 	return kc.Keys[kid]
 }
 
-
-func authRequest(w http.ResponseWriter, req *http.Request) (*TaskTrackerUser, error) {
-	gtoken, err := req.Cookie("gtoken")
-	if err == http.ErrNoCookie {
-		return nil, nil
-	} else if err != nil {
-		return nil, err
-	}
-	if keyCache == nil {
-		err = InitKeyCache(appengine.NewContext(req))
+func authRequest(w http.ResponseWriter, req *http.Request) {
+	if req.Method == http.MethodPost {
+		defer req.Body.Close()
+		body, err := ioutil.ReadAll(req.Body)
 		if err != nil {
-			return nil, err
+			http.Error(w, "Invalid request", http.StatusBadRequest)
+			return
 		}
-	}
-	token, err := jwt.Parse(gtoken.Value, func(token *jwt.Token) (interface{}, error) {
-		kid := token.Header["kid"].(string)
-		return keyCache.GetKey(kid), nil
-	})
-	if err != nil {
-		return nil, err
-	}
-	if token != nil {
-		return &TaskTrackerUser{}, nil
+		if keyCache == nil {
+			err = InitKeyCache(appengine.NewContext(req))
+			if err != nil {
+				http.Error(w, "Invalid request", http.StatusBadRequest)
+				return
+			}
+		}
+		token, err := jwt.Parse(string(body), func(token *jwt.Token) (interface{}, error) {
+			kid := token.Header["kid"].(string)
+			return keyCache.GetKey(kid), nil
+		})
+		_, err = NewSession(token, w, req)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		} else {
+			w.WriteHeader(http.StatusOK)
+		}
 	} else {
-		return nil, nil
+		http.Error(w, "", http.StatusMethodNotAllowed)
 	}
 }
 
