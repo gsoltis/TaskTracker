@@ -11,14 +11,11 @@ $(document).ready(function() {
             user_ = user;
             user_.getToken().then(function(token) {
                 authToken_ = token;
-                console.log(token);
                 if (needsLogin) {
-                    console.log('Posting now...');
                     $.ajax("/login", {
                         data: token,
                         method: 'POST'
                     }).done(function() {
-                        console.log('succeeded');
                         showLoggedIn();
                     }).fail(function(jq, status, error) {
                         console.log('Failed', status, error);
@@ -32,7 +29,6 @@ $(document).ready(function() {
                 console.log(err);
             });
         } else {
-            console.log('no user');
             showLogin();
         }
     });
@@ -43,7 +39,6 @@ $(document).ready(function() {
         $('#google-login').click(function(e) {
             e.preventDefault();
             $('.login').prop('disabled', true);
-            console.log('clicked');
             var provider = new firebase.auth.GoogleAuthProvider();
             auth.signInWithPopup(provider).then(function(result) {
                 console.log(result);
@@ -56,18 +51,42 @@ $(document).ready(function() {
     function showLoggedIn() {
         $('#logged_out').hide();
         $('#logged_in').show();
-        $('#add-task').prop('disabled', true);
+        disableTasks();
+        disableGoals();
         $.ajax("/api/tasks").done(function(tasks) {
-            console.log("tasks", tasks);
             tasks_ = tasks;
             renderTasks();
-            $('#add-task').prop('disabled', false);
+            enableTasks();
         }).fail(function(jq, status, error) {
             console.log('Failed to get tasks', status, error);
+        });
+        $.ajax("/api/goals").done(function(goals) {
+            goals_ = goals;
+            renderGoals();
+            enableGoals();
+        }).fail(function(jq, status, error) {
+            console.log('Failed to get goals', status, error);
         });
     }
 
     var tasks_ = {};
+    var goals_ = {};
+
+    function enableTasks() {
+        $('#add-task').prop('disabled', false);
+    }
+
+    function disableTasks() {
+        $('#add-task').prop('disabled', true);
+    }
+
+    function disableGoals() {
+        $('#add-goal').prop('disabled', true);
+    }
+
+    function enableGoals() {
+        $('#add-goal').prop('disabled', false);
+    }
 
     var addTask = function(task_key, task) {
         var li = $('<li class="task" id="' + task_key + '">' + task['Name'] + '</li>');
@@ -82,9 +101,35 @@ $(document).ready(function() {
         }
     }
 
+    function renderGoals() {
+        // TODO: implement this
+    }
+
+    $('#goal-submit').click(function(e) {
+        e.preventDefault();
+        disableGoals();
+        var task_id = '5768037999312896';
+        var numerator = 3;
+        var denominator = "week";
+        var goal = {
+            task_id: task_id,
+            numerator: numerator,
+            denominator: denominator
+        };
+        $.ajax("/api/goals", {
+            method: 'POST',
+            data: JSON.stringify(goal)
+        }).done(function(goal_id) {
+            console.log('Set goal: ' + goal_id);
+            addGoal(goal_id, goal);
+            // TODO: reset form
+            enableGoals();
+        });
+    });
+
     $('#task-submit').click(function(e) {
         e.preventDefault();
-        $('#add-task').prop('disabled', true);
+        disableTasks();
         var task_name = $('#task-name').val();
         if (!task_name) {
             return;
@@ -96,7 +141,7 @@ $(document).ready(function() {
             console.log('Set task: ' + task_key);
             addTask(task_key, { Name: task_name });
             $('#task-name').val('');
-            $('#add-task').prop('disabled', false);
+            enableTasks();
         }).fail(function(jq, status, error) {
             console.log("failed", status, error);
         });
