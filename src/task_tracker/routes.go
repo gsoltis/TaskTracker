@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/fatih/structs"
+	"runtime/debug"
 )
 
 
@@ -56,6 +57,7 @@ type MainPage struct {
 }
 
 func InternalServerError(w http.ResponseWriter, req *http.Request, err error) {
+	debug.PrintStack()
 	var err_string = ""
 	if err != nil {
 		err_string = err.Error()
@@ -79,6 +81,7 @@ func RequireAuth(w http.ResponseWriter, req *http.Request) *TaskTrackerUser {
 
 func taskMapForKeys(ctx appengine.Context, keys []*datastore.Key) (map[string]interface{}, error) {
 	tasks := make([]Task, len(keys), len(keys))
+	ctx.Debugf("Keys: %v", keys)
 	err := datastore.GetMulti(ctx, keys, tasks)
 	if err != nil {
 		return nil, err
@@ -168,8 +171,24 @@ const (
 
 func PeriodFromString(s string) (Period, error) {
 	switch s {
+	case "day":
+		return Day, nil
+	case "workday":
+		return WorkDay, nil
+	case "morning":
+		return Morning, nil
+	case "evening":
+		return Evening, nil
+	case "work week":
+		return WorkWeek, nil
+	case "weekend":
+		return Weekend, nil
 	case "week":
 		return Week, nil
+	case "month":
+		return Month, nil
+	case "year":
+		return Year, nil
 	default:
 		return -1, errors.New("Unknown period")
 	}
@@ -227,6 +246,7 @@ func getTasks(w http.ResponseWriter, req *http.Request) {
 	if user == nil {
 		return
 	}
+	ctx.Debugf("User: %v", user)
 	query := datastore.NewQuery("Task").Ancestor(user.Key(ctx)).Limit(10)
 	tasks := make([]Task, 0, 10)
 	keys, err := query.GetAll(ctx, &tasks)

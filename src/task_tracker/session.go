@@ -28,13 +28,14 @@ const sessionName = "_s"
 
 func UserForToken(ctx appengine.Context, token *jwt.Token) (*TaskTrackerUser, error) {
 	ctx.Debugf("Stuff: %v", token.Claims)
-	user_id := token.Claims["user_id"].(string)
+	claims := token.Claims.(jwt.MapClaims)
+	user_id := claims["user_id"].(string)
 	user_key := datastore.NewKey(ctx, "User", user_id, 0, nil)
 	var user = &TaskTrackerUser{}
 	err := datastore.Get(ctx, user_key, user)
 	if err == datastore.ErrNoSuchEntity {
 		user := &TaskTrackerUser{
-			Email: token.Claims["email"].(string),
+			Email: claims["email"].(string),
 			UserId: user_id,
 		}
 		ctx.Debugf("Setting %v", user)
@@ -44,7 +45,7 @@ func UserForToken(ctx appengine.Context, token *jwt.Token) (*TaskTrackerUser, er
 		ctx.Debugf("ERrr: %v", err)
 		return nil, err
 	} else {
-		token_email := token.Claims["email"].(string)
+		token_email := claims["email"].(string)
 		if user.Email != token_email {
 			user.Email = token_email
 			datastore.Put(ctx, user_key, user)
@@ -64,7 +65,7 @@ func NewSession(token *jwt.Token, w http.ResponseWriter, req *http.Request) (*se
 	if err != nil {
 		return nil, err
 	}
-	session.Values[userKey] = user
+	session.Values[userKey] = *user
 	err = session.Save(req, w)
 	if err != nil {
 		return nil, err
@@ -78,6 +79,7 @@ func UserForRequest(req *http.Request) (*TaskTrackerUser, error) {
 	if err != nil {
 		return nil, err
 	}
+	appengine.NewContext(req).Debugf("values: %v", session.Values)
 	val := session.Values[userKey]
 	user, ok := val.(*TaskTrackerUser)
 	if !ok {

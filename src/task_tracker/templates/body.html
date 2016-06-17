@@ -24,7 +24,28 @@
     <h4>Your goals:</h4>
     <ul id="goal-list"></ul>
     <div id="add-goal">
-        <button id="goal-submit">Add a goal</button>
+      <p>
+        What?
+        <select id="task-select">
+        </select>
+      </p>
+      <span>
+        How often?
+        <input type="number" min="1" max="9999" id="goal-frequency" />
+        times per
+        <select id="period" name="period">
+          <option value="day">day</option>
+          <option value="workday">work day</option>
+          <option value="morning">morning</option>
+          <option value="evening">evening</option>
+          <option value="workweek">work week</option>
+          <option value="weekend">weekend</option>
+          <option value="week">week</option>
+          <option value="month">month</option>
+          <option value="year">year</option>
+        </select>
+      </span>
+      <p><button id="goal-submit">Add a goal</button></p>
     </div>
 </div>
 </body>
