@@ -13,6 +13,7 @@ import (
 	"errors"
 	"github.com/fatih/structs"
 	"runtime/debug"
+	"time"
 )
 
 
@@ -21,7 +22,7 @@ func init() {
 	r := mux.NewRouter()
 	r.HandleFunc("/_ah/start", startup)
 	r.HandleFunc("/login", authRequest)
-	r.HandleFunc("/api/progress", progressHandler)
+	r.HandleFunc("/api/progress", progressHandler).Methods("POST")
 	r.HandleFunc("/api/tasks", addTask).Methods("POST")
 	r.HandleFunc("/api/tasks", getTasks).Methods("GET")
 	r.HandleFunc("/api/goals", getGoals).Methods("GET")
@@ -300,12 +301,56 @@ func addTask(w http.ResponseWriter, req *http.Request) {
 
 }
 
+type ShallowProgress struct {
+	Epoch int64 `json:"epoch"`
+	GoalId string `json:"goal_id"`
+}
+
+type Progress struct {
+	Reported time.Time
+	Aggregated bool
+}
+
 func progressHandler(w http.ResponseWriter, req *http.Request) {
+	ctx := appengine.NewContext(req)
 	user := RequireAuth(w, req)
 	if user == nil {
 		return
 	}
 
+	defer req.Body.Close()
+	bytes, err := ioutil.ReadAll(req.Body)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	var shallow_progress = &ShallowProgress{}
+	err = json.Unmarshal(bytes, shallow_progress)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	user_key := user.Key(ctx)
+	goal_id, err := strconv.ParseInt(shallow_progress.GoalId, 10, 64)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	goal_key := datastore.NewKey(ctx, "Goal", "", goal_id, user_key)
+	progress_key := datastore.NewIncompleteKey(ctx, "Progress", goal_key)
+	epoch := time.Unix(shallow_progress.Epoch, 0)
+	progress := Progress{
+		Reported: epoch,
+		Aggregated: false,
+	}
+	_, err = datastore.Put(ctx, progress_key, &progress)
+	if err != nil {
+		InternalServerError(w, req, err)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
 }
 
 func root(w http.ResponseWriter, req *http.Request) {

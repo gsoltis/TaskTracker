@@ -130,9 +130,11 @@ $(document).ready(function() {
     var task_name = goal['Task']['Name'];
     var task_span = $('<span class="goal-task" id="' + task_key + '">' + task_name + '</span>');
     var goal_span = $('<span class="goal" id="' + goal_key + '"> ' + frequency + ' times every ' + period_string + '</span>');
-    var li = $('<li class="goal"></li>');
+    var btn = $('<button class="progress">Report progress</button>');
+    var li = $('<li class="goal" id="' + goal_key + '"></li>');
     li.append(task_span);
     li.append(goal_span);
+    li.append(btn);
     $('#goal-list').append(li);
   }
 
@@ -193,5 +195,10 @@ $(document).ready(function() {
     }).fail(function(jq, status, error) {
       console.log("failed", status, error);
     });
-  })
+  });
+
+  $('#goal-list').on('click', 'button.progress', function(e) {
+    e.preventDefault();
+    console.log('Adding progress!');
+  });
 });
