@@ -101,8 +101,34 @@ $(document).ready(function() {
         }
     }
 
+    function periodFromInt(i) {
+        if (i == 6) {
+            return 'Week';
+        } else {
+            return '???';
+        }
+    }
+
+    function addGoal(goal_key, goal) {
+        var period = goal['Period'];
+        var period_string = periodFromInt(period);
+        var frequency = goal['Frequency'];
+        var task_key = goal['TaskId'];
+        var task_name = goal['Task']['Name'];
+        var task_span = $('<span class="goal-task" id="' + task_key + '">' + task_name + '</span>');
+        var goal_span = $('<span class="goal" id="' + goal_key + '"> ' + frequency + ' times every ' + period_string + '</span>');
+        var li = $('<li class="goal"></li>');
+        li.append(task_span);
+        li.append(goal_span);
+        $('#goal-list').append(li);
+    }
+
     function renderGoals() {
-        // TODO: implement this
+        for (var goal_key in goals_) {
+            if (goals_.hasOwnProperty(goal_key)) {
+                addGoal(goal_key, goals_[goal_key]);
+            }
+        }
     }
 
     $('#goal-submit').click(function(e) {

@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"encoding/json"
 	"errors"
+	"github.com/fatih/structs"
 )
 
 
@@ -76,6 +77,31 @@ func RequireAuth(w http.ResponseWriter, req *http.Request) *TaskTrackerUser {
 	}
 }
 
+func taskMapForKeys(ctx appengine.Context, keys []*datastore.Key) (map[string]interface{}, error) {
+	tasks := make([]Task, len(keys), len(keys))
+	err := datastore.GetMulti(ctx, keys, tasks)
+	if err != nil {
+		return nil, err
+	}
+	task_map := make(map[string]interface{})
+	for i, k := range keys {
+		task_map[strconv.FormatInt(k.IntID(), 10)] = structs.Map(tasks[i])
+	}
+	return task_map, nil
+}
+
+func taskMapForGoals(ctx appengine.Context, goals []Goal) (map[string]interface{}, error) {
+	task_keys_map := make(map[*datastore.Key]*Task)
+	var task_keys = make([]*datastore.Key, 0)
+	for _, goal := range goals {
+		if _, ok := task_keys_map[goal.Task]; !ok {
+			task_keys_map[goal.Task] = nil
+			task_keys = append(task_keys, goal.Task)
+		}
+	}
+	return taskMapForKeys(ctx, task_keys)
+}
+
 func getGoals(w http.ResponseWriter, req *http.Request) {
 	user := RequireAuth(w, req)
 	if user == nil {
@@ -89,12 +115,24 @@ func getGoals(w http.ResponseWriter, req *http.Request) {
 		InternalServerError(w, req, err)
 		return
 	}
-	key_map := make(map[string]*Goal)
-	for i, k := range keys {
-		key_string := strconv.FormatInt(k.IntID(), 10)
-		key_map[key_string] = &goals[i]
+	tasks_map, err := taskMapForGoals(ctx, goals)
+	if err != nil {
+		InternalServerError(w, req, err)
+		return
 	}
-	json_bytes, err := json.Marshal(key_map)
+
+	goals_map := make(map[string]interface{})
+	for i, k := range keys {
+		goal := goals[i]
+		task_id := strconv.FormatInt(goal.Task.IntID(), 10)
+		task_map := tasks_map[task_id]
+		goal_map := structs.Map(goal)
+		goal_map["Task"] = task_map
+		goal_map["TaskId"] = task_id
+		goals_map[strconv.FormatInt(k.IntID(), 10)] = goal_map
+	}
+
+	json_bytes, err := json.Marshal(goals_map)
 	if err != nil {
 		InternalServerError(w, req, err)
 		return
@@ -179,7 +217,6 @@ func addGoal(w http.ResponseWriter, req *http.Request) {
 		InternalServerError(w, req, err)
 		return
 	}
-	ctx.Debugf("Goal key? %v", goal_key.IntID())
 	w.Header().Add("Content-Type", "application/json")
 	w.Write([]byte("\"" + strconv.FormatInt(goal_key.IntID(), 10) + "\""))
 }
