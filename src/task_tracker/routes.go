@@ -27,6 +27,7 @@ func init() {
 	r.HandleFunc("/api/tasks", getTasks).Methods("GET")
 	r.HandleFunc("/api/goals", getGoals).Methods("GET")
 	r.HandleFunc("/api/goals", addGoal).Methods("POST")
+	AddCronRoutes(r.PathPrefix("/cron").Subrouter())
 	r.HandleFunc("/", root)
 	http.Handle("/", r)
 }
@@ -94,7 +95,7 @@ func taskMapForKeys(ctx appengine.Context, keys []*datastore.Key) (map[string]in
 	return task_map, nil
 }
 
-func taskMapForGoals(ctx appengine.Context, goals []Goal) (map[string]interface{}, error) {
+func taskMapForGoals(ctx appengine.Context, goals []*Goal) (map[string]interface{}, error) {
 	task_keys_map := make(map[*datastore.Key]*Task)
 	var task_keys = make([]*datastore.Key, 0)
 	for _, goal := range goals {
@@ -106,14 +107,40 @@ func taskMapForGoals(ctx appengine.Context, goals []Goal) (map[string]interface{
 	return taskMapForKeys(ctx, task_keys)
 }
 
+type ProgressReport struct {
+	GoalId string
+	ProgressTimes []time.Time
+}
+
+func progressForGoal(c chan interface{}, ctx appengine.Context, goal_key *datastore.Key) {
+	progresses := make([]Progress, 0, 100)
+	query := datastore.NewQuery("Progress").Ancestor(goal_key)
+	_, err := query.GetAll(ctx, &progresses)
+	if err != nil {
+		c <- err
+	} else {
+		var times = make([]time.Time, 0, len(progresses))
+		for _, progress := range progresses {
+			times = append(times, progress.Reported)
+		}
+		pr := ProgressReport{
+			GoalId: strconv.FormatInt(goal_key.IntID(), 10),
+			ProgressTimes: times,
+		}
+		c <- pr
+	}
+}
+
 func getGoals(w http.ResponseWriter, req *http.Request) {
 	user := RequireAuth(w, req)
 	if user == nil {
 		return
 	}
 	ctx := appengine.NewContext(req)
-	query := datastore.NewQuery("Goal").Ancestor(user.Key(ctx)).Limit(10)
-	goals := make([]Goal, 0, 10)
+	user_key := user.Key(ctx)
+	ctx.Debugf("Using user key: %v", user_key)
+	query := datastore.NewQuery("Goal").Ancestor(user_key).Limit(10)
+	goals := make([]*Goal, 0, 10)
 	keys, err := query.GetAll(ctx, &goals)
 	if err != nil {
 		InternalServerError(w, req, err)
@@ -125,6 +152,8 @@ func getGoals(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	c := make(chan interface{})
+
 	goals_map := make(map[string]interface{})
 	for i, k := range keys {
 		goal := goals[i]
@@ -134,6 +163,22 @@ func getGoals(w http.ResponseWriter, req *http.Request) {
 		goal_map["Task"] = task_map
 		goal_map["TaskId"] = task_id
 		goals_map[strconv.FormatInt(k.IntID(), 10)] = goal_map
+		go progressForGoal(c, ctx, k)
+	}
+
+
+	goal_count := len(keys)
+	var retrieved = 0
+	for retrieved < goal_count {
+		switch r := <- c; r.(type) {
+		case ProgressReport:
+			pr := r.(ProgressReport)
+			goals_map[pr.GoalId].(map[string]interface{})["Times"] = pr.ProgressTimes
+		case error:
+			InternalServerError(w, req, r.(error))
+			return
+		}
+		retrieved += 1
 	}
 
 	json_bytes, err := json.Marshal(goals_map)
@@ -249,7 +294,7 @@ func getTasks(w http.ResponseWriter, req *http.Request) {
 	}
 	ctx.Debugf("User: %v", user)
 	query := datastore.NewQuery("Task").Ancestor(user.Key(ctx)).Limit(10)
-	tasks := make([]Task, 0, 10)
+	tasks := make([]*Task, 0, 10)
 	keys, err := query.GetAll(ctx, &tasks)
 	if err != nil {
 		InternalServerError(w, req, err)
@@ -258,7 +303,7 @@ func getTasks(w http.ResponseWriter, req *http.Request) {
 	key_map := make(map[string]*Task)
 	for i, k := range keys {
 		key_string := strconv.FormatInt(k.IntID(), 10)
-		key_map[key_string] = &tasks[i]
+		key_map[key_string] = tasks[i]
 	}
 	json_bytes, err := json.Marshal(key_map)
 	if err != nil {
@@ -338,6 +383,7 @@ func progressHandler(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	// TODO: verify goal exists
 	goal_key := datastore.NewKey(ctx, "Goal", "", goal_id, user_key)
 	progress_key := datastore.NewIncompleteKey(ctx, "Progress", goal_key)
 	epoch := time.Unix(shallow_progress.Epoch, 0)

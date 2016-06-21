@@ -126,14 +126,19 @@ $(document).ready(function() {
     var period = goal['Period'];
     var period_string = periodFromInt(period);
     var frequency = goal['Frequency'];
+    var progress = goal['Times'];
+    var progress_count = progress.length;
     var task_key = goal['TaskId'];
     var task_name = goal['Task']['Name'];
     var task_span = $('<span class="goal-task" id="' + task_key + '">' + task_name + '</span>');
-    var goal_span = $('<span class="goal" id="' + goal_key + '"> ' + frequency + ' times every ' + period_string + '</span>');
+    var goal_span = $('<span class="goal" id="' + goal_key + '">' + frequency + ' times every ' + period_string + '</span>');
+    var percent_progress = Math.floor(((progress_count / frequency) * 100) + 0.5);
+    var progress_span = $('<span>' + percent_progress + '% so far</span>');
     var btn = $('<button class="progress">Report progress</button>');
     var li = $('<li class="goal" id="' + goal_key + '"></li>');
     li.append(task_span);
     li.append(goal_span);
+    li.append(progress_span);
     li.append(btn);
     $('#goal-list').append(li);
   }
@@ -199,6 +204,19 @@ $(document).ready(function() {
 
   $('#goal-list').on('click', 'button.progress', function(e) {
     e.preventDefault();
-    console.log('Adding progress!');
+    var goal_id = $(this).parent().attr('id');
+    var epoch = Math.floor(new Date().getTime() / 1000);
+    console.log('Adding progress for ' + goal_id + '!');
+    $.ajax('/api/progress', {
+      method: 'POST',
+      data: JSON.stringify({
+        goal_id: goal_id,
+        epoch: epoch
+      })
+    }).done(function() {
+      console.log('Recorded progress');
+    }).fail(function(jq, status, error) {
+      console.log('Failed to record progress', status, error);
+    });
   });
 });

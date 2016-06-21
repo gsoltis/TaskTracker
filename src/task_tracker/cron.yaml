@@ -1,0 +1,4 @@
+cron:
+- description: Hourly aggregate job
+  url: /cron/aggregate
+  schedule: every 1 hours

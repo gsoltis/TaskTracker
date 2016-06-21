@@ -7,11 +7,13 @@ import (
 	"appengine"
 	"encoding/gob"
 	"appengine/datastore"
+	"time"
 )
 
 type TaskTrackerUser struct {
 	Email string
 	UserId string
+	LastAggregation time.Time
 }
 
 func (u *TaskTrackerUser) Key(ctx appengine.Context) *datastore.Key {
@@ -37,6 +39,7 @@ func UserForToken(ctx appengine.Context, token *jwt.Token) (*TaskTrackerUser, er
 		user := &TaskTrackerUser{
 			Email: claims["email"].(string),
 			UserId: user_id,
+			LastAggregation: time.Now(),
 		}
 		ctx.Debugf("Setting %v", user)
 		key, err := datastore.Put(ctx, user_key, user)
@@ -56,7 +59,6 @@ func UserForToken(ctx appengine.Context, token *jwt.Token) (*TaskTrackerUser, er
 
 func NewSession(token *jwt.Token, w http.ResponseWriter, req *http.Request) (*sessions.Session, error) {
 	ctx := appengine.NewContext(req)
-	ctx.Debugf("Claims: %v", token.Claims)
 	user, err := UserForToken(ctx, token)
 	if err != nil {
 		return nil, err
@@ -79,7 +81,6 @@ func UserForRequest(req *http.Request) (*TaskTrackerUser, error) {
 	if err != nil {
 		return nil, err
 	}
-	appengine.NewContext(req).Debugf("values: %v", session.Values)
 	val := session.Values[userKey]
 	user, ok := val.(*TaskTrackerUser)
 	if !ok {
