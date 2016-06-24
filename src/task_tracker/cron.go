@@ -39,7 +39,12 @@ func aggregateGoal(wg *sync.WaitGroup, ctx appengine.Context, goal_key_string st
 	if len(aggregations) > 0 {
 		last_aggregation = &aggregations[0]
 	}
-	GetAggregations(ctx, last_aggregation, goal.Period, goal.Frequency, progress)
+	agg_results := GetAggregations(ctx, last_aggregation, goal.Period, goal.Frequency, progress)
+	err = agg_results.Record(ctx, goal_key)
+	if err != nil {
+		ctx.Errorf("Failed to record aggregations")
+		return
+	}
 }
 
 func aggregateUser(wg *sync.WaitGroup, ctx appengine.Context, user_key *datastore.Key, aggregation_time *time.Time) {
@@ -91,7 +96,5 @@ func aggregateProgress(w http.ResponseWriter, req *http.Request) {
 		go aggregateUser(&wg, ctx, user_key, &aggregation_time.LastAggregation)
 	}
 	wg.Wait()
-	//ctx.Debugf("Request: %v", req)
-	//ctx.Debugf("Cookies: %v", req.Cookies())
-	fmt.Fprintf(w, "Cronnin'")
+	fmt.Fprintf(w, "Aggregated")
 }
