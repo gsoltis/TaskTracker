@@ -11,6 +11,7 @@ import (
 	"appengine/urlfetch"
 	"io/ioutil"
 	"github.com/dgrijalva/jwt-go"
+	"time"
 )
 
 func make_pk(n_str string, e_str string) (*rsa.PublicKey, error) {
@@ -64,6 +65,7 @@ const keysURL = "https://www.googleapis.com/service_accounts/v1/jwk/securetoken@
 
 type KeyCache struct {
 	Keys map[string]*rsa.PublicKey
+	Refreshed time.Time
 }
 
 func NewKeyCache(ctx appengine.Context) (*KeyCache, error) {
@@ -81,7 +83,7 @@ func NewKeyCache(ctx appengine.Context) (*KeyCache, error) {
 	if err != nil {
 		return nil, err
 	}
-	kc := KeyCache{Keys: key_map}
+	kc := KeyCache{Keys: key_map, Refreshed: time.Now()}
 	return &kc, nil
 }
 
@@ -100,6 +102,10 @@ func (kc *KeyCache) GetKey(kid string) *rsa.PublicKey {
 	return kc.Keys[kid]
 }
 
+func (kc *KeyCache) NeedsRefresh() bool {
+	return kc == nil || kc.Refreshed.Before(time.Now().Sub(time.Hour))
+}
+
 func authRequest(w http.ResponseWriter, req *http.Request) {
 	if req.Method == http.MethodPost {
 		defer req.Body.Close()
@@ -108,7 +114,7 @@ func authRequest(w http.ResponseWriter, req *http.Request) {
 			http.Error(w, "Invalid request", http.StatusBadRequest)
 			return
 		}
-		if keyCache == nil {
+		if keyCache.NeedsRefresh() {
 			err = InitKeyCache(appengine.NewContext(req))
 			if err != nil {
 				http.Error(w, "Invalid request", http.StatusBadRequest)

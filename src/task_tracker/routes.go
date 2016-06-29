@@ -20,7 +20,7 @@ import (
 
 func init() {
 	r := mux.NewRouter()
-	r.HandleFunc("/_ah/start", startup)
+	r.HandleFunc("/_ah/warmup", warmup)
 	r.HandleFunc("/login", authRequest)
 	r.HandleFunc("/api/progress", progressHandler).Methods("POST")
 	r.HandleFunc("/api/tasks", addTask).Methods("POST")
@@ -32,7 +32,7 @@ func init() {
 	http.Handle("/", r)
 }
 
-func startup(w http.ResponseWriter, req *http.Request) {
+func warmup(w http.ResponseWriter, req *http.Request) {
 	fmt.Printf("HAndling startup")
 	err := InitKeyCache(appengine.NewContext(req))
 	if err != nil {
