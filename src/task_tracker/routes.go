@@ -114,7 +114,7 @@ type ProgressReport struct {
 
 func progressForGoal(c chan interface{}, ctx appengine.Context, goal_key *datastore.Key) {
 	progresses := make([]Progress, 0, 100)
-	query := datastore.NewQuery("Progress").Ancestor(goal_key)
+	query := datastore.NewQuery("Progress").Ancestor(goal_key).Filter("Aggregated = ", false)
 	_, err := query.GetAll(ctx, &progresses)
 	if err != nil {
 		c <- err
@@ -129,6 +129,26 @@ func progressForGoal(c chan interface{}, ctx appengine.Context, goal_key *datast
 		}
 		c <- pr
 	}
+}
+
+type AggregationReport struct {
+	GoalId string
+	Aggregations []Aggregation
+}
+
+func aggregationForGoal(c chan interface{}, ctx appengine.Context, goal_key *datastore.Key) {
+	aggregations := make([]Aggregation, 0, 10)
+	query := datastore.NewQuery("Aggregation").Ancestor(goal_key).Limit(10).Order("-Completed")
+	_, err := query.GetAll(ctx, &aggregations)
+	if err != nil {
+		c <- err
+	} else {
+		c <- AggregationReport{
+			GoalId: strconv.FormatInt(goal_key.IntID(), 10),
+			Aggregations: aggregations,
+		}
+	}
+
 }
 
 func getGoals(w http.ResponseWriter, req *http.Request) {
@@ -152,7 +172,9 @@ func getGoals(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	c := make(chan interface{})
+	progress_chan := make(chan interface{})
+
+	agg_chan := make(chan interface{})
 
 	goals_map := make(map[string]interface{})
 	for i, k := range keys {
@@ -163,20 +185,28 @@ func getGoals(w http.ResponseWriter, req *http.Request) {
 		goal_map["Task"] = task_map
 		goal_map["TaskId"] = task_id
 		goals_map[strconv.FormatInt(k.IntID(), 10)] = goal_map
-		go progressForGoal(c, ctx, k)
+		go progressForGoal(progress_chan, ctx, k)
+		go aggregationForGoal(agg_chan, ctx, k)
 	}
 
 
 	goal_count := len(keys)
 	var retrieved = 0
 	for retrieved < goal_count {
-		switch r := <- c; r.(type) {
+		switch r := <-progress_chan; r.(type) {
 		case ProgressReport:
 			pr := r.(ProgressReport)
 			goals_map[pr.GoalId].(map[string]interface{})["Times"] = pr.ProgressTimes
 		case error:
 			InternalServerError(w, req, r.(error))
 			return
+		}
+		switch a := <-agg_chan; a.(type) {
+		case AggregationReport:
+			ar := a.(AggregationReport)
+			goals_map[ar.GoalId].(map[string]interface{})["Aggregations"] = ar.Aggregations
+		case error:
+			InternalServerError(w, req, a.(error))
 		}
 		retrieved += 1
 	}
@@ -205,36 +235,15 @@ type Period int
 
 const (
 	Day Period = iota
-	WorkDay
-	Morning
-	Evening
-	WorkWeek
-	Weekend
 	Week
-	Month
-	Year
 )
 
 func PeriodFromString(s string) (Period, error) {
 	switch s {
 	case "day":
 		return Day, nil
-	case "workday":
-		return WorkDay, nil
-	case "morning":
-		return Morning, nil
-	case "evening":
-		return Evening, nil
-	case "work week":
-		return WorkWeek, nil
-	case "weekend":
-		return Weekend, nil
 	case "week":
 		return Week, nil
-	case "month":
-		return Month, nil
-	case "year":
-		return Year, nil
 	default:
 		return -1, errors.New("Unknown period")
 	}

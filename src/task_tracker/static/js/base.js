@@ -105,14 +105,7 @@ $(document).ready(function() {
 
   var Periods = [
     'day',
-    'work day',
-    'morning',
-    'evening',
-    'work week',
-    'weekend',
-    'week',
-    'month',
-    'year'
+    'week'
   ];
   function periodFromInt(i) {
     return i < Periods.length ? Periods[i] : '???';
@@ -122,7 +115,7 @@ $(document).ready(function() {
     return Periods.indexOf(period);
   }
 
-  function addGoal(goal_key, goal) {
+  function goalLI(goal_key, goal) {
     var period = goal['Period'];
     var period_string = periodFromInt(period);
     var frequency = goal['Frequency'];
@@ -135,12 +128,32 @@ $(document).ready(function() {
     var percent_progress = Math.floor(((progress_count / frequency) * 100) + 0.5);
     var progress_span = $('<span>' + percent_progress + '% so far</span>');
     var btn = $('<button class="progress">Report progress</button>');
+    var total = goal['Aggregations'].length;
+    var completed = 0;
+    for (var agg in goal['Aggregations']) {
+      if (agg['Success']) {
+        completed++;
+      }
+    }
+    var aggs = $('<span>' + completed + ' out of last ' + total + '</span>');
     var li = $('<li class="goal" id="' + goal_key + '"></li>');
     li.append(task_span);
     li.append(goal_span);
     li.append(progress_span);
+    li.append(aggs);
     li.append(btn);
+    return li;
+  }
+
+  function addGoal(goal_key, goal) {
+    var li = goalLI(goal_key, goal);
     $('#goal-list').append(li);
+  }
+
+  function refreshGoal(goal_key, goal) {
+    var existing = $('#' + goal_key);
+    var replacement = goalLI(goal_key, goal);
+    existing.replaceWith(replacement);
   }
 
   function renderGoals() {
@@ -174,8 +187,11 @@ $(document).ready(function() {
         TaskId: task_id,
         Task: {
           Name: tasks_[task_id]['Name']
-        }
+        },
+        Times: [],
+        Aggregations: []
       };
+      goals_[goal_id] = goal;
       addGoal(goal_id, goal);
       // TODO: reset form
       enableGoals();
@@ -194,7 +210,9 @@ $(document).ready(function() {
       data: task_name
     }).done(function(task_key) {
       console.log('Set task: ' + task_key);
-      addTask(task_key, { Name: task_name });
+      var task = { Name: task_name };
+      tasks_[task_key] = task;
+      addTask(task_key, task);
       $('#task-name').val('');
       enableTasks();
     }).fail(function(jq, status, error) {
@@ -204,6 +222,8 @@ $(document).ready(function() {
 
   $('#goal-list').on('click', 'button.progress', function(e) {
     e.preventDefault();
+    var btn = $(e.target);
+    btn.prop('disabled', true);
     var goal_id = $(this).parent().attr('id');
     var epoch = Math.floor(new Date().getTime() / 1000);
     console.log('Adding progress for ' + goal_id + '!');
@@ -215,8 +235,12 @@ $(document).ready(function() {
       })
     }).done(function() {
       console.log('Recorded progress');
+      goals_[goal_id]['Times'].push(epoch);
+      //btn.prop('disabled', false);
+      refreshGoal(goal_id, goals_[goal_id]);
     }).fail(function(jq, status, error) {
       console.log('Failed to record progress', status, error);
+      btn.prop('disabled', false);
     });
   });
 });

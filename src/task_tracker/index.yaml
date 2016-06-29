@@ -13,5 +13,11 @@ indexes:
 - kind: Aggregation
   ancestor: yes
   properties:
+  - name: Completed
+    direction: desc
+
+- kind: Aggregation
+  ancestor: yes
+  properties:
   - name: Recorded
     direction: desc

@@ -13,7 +13,8 @@ type ProgressEntity struct {
 }
 
 type Aggregation struct {
-	Recorded time.Time
+	Recorded time.Time	`json:"-"`
+	Completed time.Time
 	Success  bool
 	Count    int
 }
@@ -65,6 +66,8 @@ func (p Period) toPeriodStart(t time.Time) time.Time {
 	switch p {
 	case Day:
 		return t.Truncate(24 * time.Hour)
+	case Week:
+		return t.Truncate(7 * 24 * time.Hour)
 	}
 	return t
 }
@@ -73,6 +76,8 @@ func (p Period) addPeriod(from time.Time) time.Time {
 	switch p {
 	case Day:
 		return from.Add(24 * time.Hour)
+	case Week:
+		return from.Add(7 * 24 * time.Hour)
 	}
 	return from
 }
@@ -97,6 +102,7 @@ func aggregateFromTime(period_start time.Time, end_time time.Time, reports []*Pr
 	if found_reports > 0 {
 		agg := &Aggregation{
 			Count: found_reports,
+			Completed: end_time,
 		}
 		var remaining []*ProgressEntity
 		if first_in_next_period == -1 {
