@@ -10,43 +10,45 @@
 </head>
 <body>
 <div id="logged_out" style="display: none;">
-    You are logged out. Click a button
-    <button class="login" id="google-login">Login with Google</button>
-
+  You are logged out. Click a button
+  <button class="login" id="google-login">Login with Google</button>
 </div>
 <div id="logged_in" style="display: none;">
-    <h4>Your tasks:</h4>
-    <ul id="task-list"></ul>
-    <div id="add-task">
-        <input type="text" id="task-name" />
-        <input type="submit" id="task-submit" value="Add A Task">
-    </div>
-    <h4>Your goals:</h4>
-    <ul id="goal-list"></ul>
-    <div id="add-goal">
-      <p>
-        What?
-        <select id="task-select">
-        </select>
-      </p>
-      <span>
-        How often?
-        <input type="number" min="1" max="9999" id="goal-frequency" />
-        times per
-        <select id="period" name="period">
-          <option value="day">day</option>
-          <option value="workday">work day</option>
-          <option value="morning">morning</option>
-          <option value="evening">evening</option>
-          <option value="workweek">work week</option>
-          <option value="weekend">weekend</option>
-          <option value="week">week</option>
-          <option value="month">month</option>
-          <option value="year">year</option>
-        </select>
-      </span>
-      <p><button id="goal-submit">Add a goal</button></p>
-    </div>
+  <h4>Your tasks:</h4>
+  <ul id="task-list"></ul>
+  <div id="add-task">
+    <input type="text" id="task-name" />
+    <input type="submit" id="task-submit" value="Add A Task">
+  </div>
+  <h4>Your goals:</h4>
+  <ul id="goal-list"></ul>
+  <div id="add-goal">
+    <p>
+      What?
+      <select id="task-select">
+      </select>
+    </p>
+    <span>
+      How often?
+      <input type="number" min="1" max="9999" id="goal-frequency" />
+      times per
+      <select id="period" name="period">
+        <option value="day">day</option>
+        <option value="workday">work day</option>
+        <option value="morning">morning</option>
+        <option value="evening">evening</option>
+        <option value="workweek">work week</option>
+        <option value="weekend">weekend</option>
+        <option value="week">week</option>
+        <option value="month">month</option>
+        <option value="year">year</option>
+      </select>
+    </span>
+    <p><button id="goal-submit">Add a goal</button></p>
+  </div>
+  <div>
+    <button id="logout">Logout</button>
+  </div>
 </div>
 </body>
 </html>

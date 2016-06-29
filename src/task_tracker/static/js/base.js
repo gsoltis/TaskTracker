@@ -5,13 +5,16 @@ $(document).ready(function() {
   auth.onAuthStateChanged(function(user) {
     if (user) {
       var needsLogin = false;
-      if (!user_ && !Cookies.get('_s')) {
+      var sessionCookie = Cookies.get('_s');
+      console.log('session cookie: ', sessionCookie);
+      if (!user_ && !sessionCookie) {
         needsLogin = true;
       }
       user_ = user;
       user_.getToken().then(function(token) {
         authToken_ = token;
         if (needsLogin) {
+          console.log('needs login');
           $.ajax("/login", {
             data: token,
             method: 'POST'
@@ -21,6 +24,7 @@ $(document).ready(function() {
             console.log('Failed', status, error);
           });
         } else {
+          console.log("Doesn't need login");
           showLoggedIn();
         }
         //Cookies.set('gtoken', token);
@@ -29,6 +33,7 @@ $(document).ready(function() {
         console.log(err);
       });
     } else {
+      user_ = null;
       showLogin();
     }
   });
@@ -36,6 +41,7 @@ $(document).ready(function() {
   function showLogin() {
     $('#logged_out').show();
     $('#logged_in').hide();
+    $('.login').prop('disabled', false);
     $('#google-login').click(function(e) {
       e.preventDefault();
       $('.login').prop('disabled', true);
@@ -67,10 +73,26 @@ $(document).ready(function() {
     }).fail(function(jq, status, error) {
       console.log('Failed to get goals', status, error);
     });
+
+    $('#logout').click(function(e) {
+      e.preventDefault();
+      console.log('Logging out');
+      logout();
+    });
   }
 
   var tasks_ = {};
   var goals_ = {};
+
+  function logout() {
+    tasks_ = {};
+    goals_ = {};
+    $('#goal-list').empty();
+    $('#task-list').empty();
+    auth.signOut();
+    Cookies.remove('_s');
+    //showLogin();
+  }
 
   function enableTasks() {
     $('#add-task').prop('disabled', false);
