@@ -12,6 +12,18 @@ import (
 
 func AddCronRoutes(r *mux.Router) {
 	r.HandleFunc("/aggregate", aggregateProgress)
+	r.HandleFunc("/resetTestData", resetTestData)
+}
+
+func resetUser(wg sync.WaitGroup, user_key *datastore.Key) {
+	//task_keys, err := resetTasksForUser(user_key)
+	//goal_keys, err := resetGoalsForUser(user_key, task_keys)
+	//resetProgressForUser(user_key, goal_keys)
+	wg.Done()
+}
+
+func resetTestData() {
+
 }
 
 func aggregateGoal(wg *sync.WaitGroup, ctx appengine.Context, goal_key_string string, progress []*ProgressEntity) {
