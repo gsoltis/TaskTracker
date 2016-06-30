@@ -56,6 +56,7 @@ func aggregateUser(wg *sync.WaitGroup, ctx appengine.Context, user_key *datastor
 		ctx.Errorf("Failed, %v", err)
 		return
 	}
+	ctx.Debugf("Got progress: %v", progresses)
 	goal_keys := make(map[string][]*ProgressEntity)
 	for i, key := range keys {
 		goal_key := key.Parent().Encode()

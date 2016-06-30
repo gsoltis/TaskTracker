@@ -1,55 +1,104 @@
-{{define "body"}}
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    {{template "firebase"}}
-    <script src="/static/js/jquery-3.0.0.min.js"></script>
-    <script src="/static/js/js.cookie.js"></script>
-    <script src="/static/js/base.js"></script>
-    <title>Task Tracker</title>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-COMPATIBLE" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="https://www.gstatic.com/firebasejs/live/3.0/firebase.js"></script>
+  <script>
+    // Initialize Firebase
+    var config = {
+      apiKey: "AIzaSyBp_ZWejNElYKSw_aqeMLL1cF7xQVtgNIg",
+      authDomain: "tasktracker-1337.firebaseapp.com",
+      databaseURL: "https://tasktracker-1337.firebaseio.com",
+      storageBucket: "tasktracker-1337.appspot.com"
+    };
+    firebase.initializeApp(config);
+  </script>
+  <title>Task Tracker</title>
+  <link href="/static/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/static/css/main.css" rel="stylesheet">
 </head>
-<body>
+<body role="document">
 <div id="logged_out" style="display: none;">
   You are logged out. Click a button
-  <button class="login" id="google-login">Login with Google</button>
+  <button type="button" class="btn btn-sm btn-success" id="google-login">Login with Google</button>
 </div>
-<div id="logged_in" style="display: none;">
-  <h4>Your tasks:</h4>
-  <ul id="task-list"></ul>
-  <div id="add-task">
-    <input type="text" id="task-name" />
-    <input type="submit" id="task-submit" value="Add A Task">
+<div id="logged_in" class="container" role="main" style="display: none;">
+  <!-- GOALS -->
+  <div class="panel panel-default">
+    <div class="panel-heading"><h3>Goals</h3></div>
+    <div class="panel-body">
+      <ul id="goal-list" class="list-group"></ul>
+      <div id="add-goal" class="panel panel-default">
+        <div class="panel-heading">Add A Goal</div>
+        <div class="panel-body container">
+          <div id="task-dropdown" class="dropdown col-sm-2">
+            <button id="task-select-a" class="dropdown-toggle" data-toggle="dropdown" role="button"
+               aria-haspopup="true" aria-expanded="true">Task
+              <span class="caret"></span>
+            </button>
+            <ul id="task-select" class="dropdown-menu" aria-labelledby="task-select-a">
+            </ul>
+          </div>
+          <div class="col-sm-1">
+            <input type="number" min="1" max="9999" id="goal-frequency" />
+          </div>
+          <div class="col-sm-2">times per</div>
+          <div class="dropdown col-sm-2">
+            <button id="period" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true"
+                    aria-expanded="true">Time Period<span class="caret"></span>
+            </button>
+            <ul id="period-options" class="dropdown-menu" aria-labelledby="period">
+              <li><a href="#">day</a></li>
+              <li><a href="#">week</a></li>
+            </ul>
+          </div>
+          <div class="col-sm-2">
+            <p><button id="goal-submit" class="btn btn-sm btn-success">Add a goal</button></p>
+          </div>
+          <div class="col-sm-3"></div>
+        </div>
+      </div>
+    </div>
   </div>
-  <h4>Your goals:</h4>
-  <ul id="goal-list"></ul>
-  <div id="add-goal">
-    <p>
-      What?
-      <select id="task-select">
-      </select>
-    </p>
-    <span>
-      How often?
-      <input type="number" min="1" max="9999" id="goal-frequency" />
-      times per
-      <select id="period" name="period">
-        <option value="day">day</option>
-        <option value="workday">work day</option>
-        <option value="morning">morning</option>
-        <option value="evening">evening</option>
-        <option value="workweek">work week</option>
-        <option value="weekend">weekend</option>
-        <option value="week">week</option>
-        <option value="month">month</option>
-        <option value="year">year</option>
-      </select>
-    </span>
-    <p><button id="goal-submit">Add a goal</button></p>
+
+  <!-- TASKS -->
+  <div class="panel panel-default ">
+    <div class="panel-heading"><h4>Tasks</h4></div>
+    <div class="panel-body">
+      <ul id="task-list" class="list-group"></ul>
+      <div id="add-task">
+        <input type="text" id="task-name" />
+        <input type="submit" id="task-submit" value="Add Task" class="btn btn-sm btn-info">
+      </div>
+    </div>
   </div>
-  <div>
-    <button id="logout">Logout</button>
+  <div class="row">
+    <button id="logout" type="button" class="btn btn-sm btn-danger">Logout</button>
   </div>
 </div>
+<script id="goal-template" type="text/x-handlebars-template">
+  <li class="goal list-group-item" id="{{ goal_key }}">
+    <div class="row">
+      <div class="col-md-1"><span class="goal-task" id="{{task_key}}">{{task_name}}</span></div>
+      <div class="col-md-2"><span class="goal-target">{{ frequency }} times every {{period_string}}</span></div>
+      <div class="col-md-4">
+        <div class="progress">
+          <div role="progressbar" aria-valuenow="{{percent}}" aria-valuemax="100" aria-valuemin="0"
+               style="width: {{percent}}%;"
+               class="progress-bar {{#if isComplete}}progress-bar-success{{/if}}"></div>
+        </div>
+      </div>
+      <div class="col-md-2"><span>{{#if total}}{{completed}} out of last {{total}}{{/if}}</span></div>
+      <div class="col-md-1"><button class="btn btn-primary btn-s goal-progress">Report Progress</button></div>
+    </div>
+  </li>
+</script>
+<script src="/static/js/jquery.min.js"></script>
+<script src="/static/js/bootstrap.min.js"></script>
+<script src="/static/js/js.cookie.js"></script>
+<script src="/static/js/handlebars.min-latest.js"></script>
+<script src="/static/js/base.js"></script>
 </body>
 </html>
-{{end}}

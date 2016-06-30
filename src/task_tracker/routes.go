@@ -3,7 +3,6 @@ package task_tracker
 import (
 	"github.com/gorilla/mux"
 	"net/http"
-	"html/template"
 	"appengine"
 	"fmt"
 	"io/ioutil"
@@ -28,7 +27,7 @@ func init() {
 	r.HandleFunc("/api/goals", getGoals).Methods("GET")
 	r.HandleFunc("/api/goals", addGoal).Methods("POST")
 	AddCronRoutes(r.PathPrefix("/cron").Subrouter())
-	r.HandleFunc("/", root)
+	//r.HandleFunc("/", root)
 	http.Handle("/", r)
 }
 
@@ -41,8 +40,6 @@ func warmup(w http.ResponseWriter, req *http.Request) {
 		fmt.Fprintf(w, "Ok")
 	}
 }
-
-var templates = template.Must(template.ParseGlob("templates/*"))
 
 type Task struct {
 	Name string
@@ -406,16 +403,4 @@ func progressHandler(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusOK)
-}
-
-func root(w http.ResponseWriter, req *http.Request) {
-	user, err := UserForRequest(req)
-	if err != nil {
-		InternalServerError(w, req, err)
-		return
-	}
-	mp := MainPage{
-		User: user,
-	}
-	templates.ExecuteTemplate(w, "body", &mp)
 }

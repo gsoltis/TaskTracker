@@ -103,7 +103,7 @@ func (kc *KeyCache) GetKey(kid string) *rsa.PublicKey {
 }
 
 func (kc *KeyCache) NeedsRefresh() bool {
-	return kc == nil || kc.Refreshed.Before(time.Now().Sub(time.Hour))
+	return kc == nil || time.Since(kc.Refreshed) > time.Hour
 }
 
 func authRequest(w http.ResponseWriter, req *http.Request) {

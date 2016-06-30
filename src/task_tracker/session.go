@@ -36,22 +36,26 @@ func UserForToken(ctx appengine.Context, token *jwt.Token) (*TaskTrackerUser, er
 	var user = &TaskTrackerUser{}
 	err := datastore.Get(ctx, user_key, user)
 	if err == datastore.ErrNoSuchEntity {
-		user := &TaskTrackerUser{
+		user = &TaskTrackerUser{
 			Email: claims["email"].(string),
 			UserId: user_id,
 			LastAggregation: time.Now(),
 		}
-		ctx.Debugf("Setting %v", user)
-		key, err := datastore.Put(ctx, user_key, user)
-		ctx.Debugf("Put? %v / %v", err, key)
+		_, err := datastore.Put(ctx, user_key, user)
+		if err != nil {
+			return nil, err
+		}
 	} else if err != nil {
-		ctx.Debugf("ERrr: %v", err)
 		return nil, err
 	} else {
 		token_email := claims["email"].(string)
 		if user.Email != token_email {
+			ctx.Debugf("User email case")
 			user.Email = token_email
-			datastore.Put(ctx, user_key, user)
+			_, err = datastore.Put(ctx, user_key, user)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 	return user, nil

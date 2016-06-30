@@ -6,7 +6,6 @@ $(document).ready(function() {
     if (user) {
       var needsLogin = false;
       var sessionCookie = Cookies.get('_s');
-      console.log('session cookie: ', sessionCookie);
       if (!user_ && !sessionCookie) {
         needsLogin = true;
       }
@@ -111,9 +110,10 @@ $(document).ready(function() {
   }
 
   var addTask = function(task_key, task) {
-    var li = $('<li class="task" id="' + task_key + '">' + task['Name'] + '</li>');
+    var li = $('<li class="task list-group-item" id="' + task_key + '">' + task['Name'] + '</li>');
     $('#task-list').append(li);
-    var option = $('<option value="' + task_key + '">' + task['Name'] + '</option>');
+    //var option = $('<option value="' + task_key + '">' + task['Name'] + '</option>');
+    var option = $('<li><a href="#" task_key="' + task_key + '">' + task['Name'] + '</a></li>');
     $('#task-select').append(option);
   };
 
@@ -137,6 +137,8 @@ $(document).ready(function() {
     return Periods.indexOf(period);
   }
 
+  var goal_li_template = Handlebars.compile($('#goal-template').html());
+
   function goalLI(goal_key, goal) {
     var period = goal['Period'];
     var period_string = periodFromInt(period);
@@ -145,11 +147,7 @@ $(document).ready(function() {
     var progress_count = progress.length;
     var task_key = goal['TaskId'];
     var task_name = goal['Task']['Name'];
-    var task_span = $('<span class="goal-task" id="' + task_key + '">' + task_name + '</span>');
-    var goal_span = $('<span class="goal" id="' + goal_key + '">' + frequency + ' times every ' + period_string + '</span>');
     var percent_progress = Math.floor(((progress_count / frequency) * 100) + 0.5);
-    var progress_span = $('<span>' + percent_progress + '% so far</span>');
-    var btn = $('<button class="progress">Report progress</button>');
     var total = goal['Aggregations'].length;
     var completed = 0;
     for (var agg in goal['Aggregations']) {
@@ -157,14 +155,17 @@ $(document).ready(function() {
         completed++;
       }
     }
-    var aggs = $('<span>' + completed + ' out of last ' + total + '</span>');
-    var li = $('<li class="goal" id="' + goal_key + '"></li>');
-    li.append(task_span);
-    li.append(goal_span);
-    li.append(progress_span);
-    li.append(aggs);
-    li.append(btn);
-    return li;
+    return goal_li_template({
+      goal_key: goal_key,
+      frequency: frequency,
+      period_string: period_string,
+      task_key: task_key,
+      task_name: task_name,
+      isComplete: percent_progress == 100,
+      percent: percent_progress,
+      completed: completed,
+      total: total
+    });
   }
 
   function addGoal(goal_key, goal) {
@@ -190,9 +191,15 @@ $(document).ready(function() {
     e.preventDefault();
     disableGoals();
     var goal_root = $('#add-goal');
-    var task_id = $('#task-select').val();
+    var task_id = $('#task-select-a').attr('task_key');
+    if (!task_id) {
+      return;
+    }
     var numerator = parseInt(goal_root.find('#goal-frequency').val(), 10);
-    var denominator = goal_root.find('#period').val();
+    var denominator = goal_root.find('#period').text().trim();
+    if (denominator.includes('Time Period')) {
+      return;
+    }
     var goal = {
       task_id: task_id,
       numerator: numerator,
@@ -220,6 +227,24 @@ $(document).ready(function() {
     });
   });
 
+  var add_goal = $('#add-goal');
+
+  add_goal.on('click', '#task-select.dropdown-menu li a', function() {
+    var option = $(this).text();
+    var task_key = $(this).attr('task_key');
+    var html = option + ' <span class="caret"></span>';
+    var btn = $(this).parents('.dropdown').find('button[data-toggle="dropdown"]');
+    btn.html(html);
+    btn.attr('task_key', task_key);
+  });
+
+  add_goal.on('click', '#period-options.dropdown-menu li a', function() {
+    var option = $(this).text();
+    var html = option + ' <span class="caret"></span>';
+    var btn = $(this).parents('.dropdown').find('button[data-toggle="dropdown"]');
+    btn.html(html);
+  });
+
   $('#task-submit').click(function(e) {
     e.preventDefault();
     disableTasks();
@@ -242,13 +267,12 @@ $(document).ready(function() {
     });
   });
 
-  $('#goal-list').on('click', 'button.progress', function(e) {
+  $('#goal-list').on('click', 'button.goal-progress', function(e) {
     e.preventDefault();
     var btn = $(e.target);
     btn.prop('disabled', true);
-    var goal_id = $(this).parent().attr('id');
+    var goal_id = $(this).parents('li').attr('id');
     var epoch = Math.floor(new Date().getTime() / 1000);
-    console.log('Adding progress for ' + goal_id + '!');
     $.ajax('/api/progress', {
       method: 'POST',
       data: JSON.stringify({
@@ -256,7 +280,6 @@ $(document).ready(function() {
         epoch: epoch
       })
     }).done(function() {
-      console.log('Recorded progress');
       goals_[goal_id]['Times'].push(epoch);
       //btn.prop('disabled', false);
       refreshGoal(goal_id, goals_[goal_id]);
