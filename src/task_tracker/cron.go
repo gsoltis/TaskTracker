@@ -15,14 +15,38 @@ func AddCronRoutes(r *mux.Router) {
 	r.HandleFunc("/resetTestData", resetTestData)
 }
 
-func resetUser(wg sync.WaitGroup, user_key *datastore.Key) {
+var defaultTasks = [3]Task{Task{"Walk"}, Task{"Run"}, Task{"Drink Water"}}
+
+func resetTasksForUser(ctx appengine.Context, user_key *datastore.Key) ([]*datastore.Key, error) {
+	task_keys, err:= datastore.NewQuery("Task").Ancestor(user_key).KeysOnly().GetAll(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	datastore.DeleteMulti(ctx, task_keys)
+	task_keys_stub := [3]*datastore.Key{
+		datastore.NewIncompleteKey(ctx, "Task", user_key),
+		datastore.NewIncompleteKey(ctx, "Task", user_key),
+		datastore.NewIncompleteKey(ctx, "Task", user_key),
+	}
+	new_task_keys, err := datastore.PutMulti(ctx, task_keys_stub, defaultTasks)
+	if err != nil {
+		return nil, err
+	}
+	return new_task_keys, nil
+}
+
+func resetGoalsForUser(ctx appengine.Context, user_key *datastore.Key, task_keys []*datastore.Key) ([]*datastore.Key, error) {
+
+}
+
+func resetUser(wg sync.WaitGroup, ctx appengine.Context, user_key *datastore.Key) {
 	//task_keys, err := resetTasksForUser(user_key)
 	//goal_keys, err := resetGoalsForUser(user_key, task_keys)
 	//resetProgressForUser(user_key, goal_keys)
 	wg.Done()
 }
 
-func resetTestData() {
+func resetTestData(w http.ResponseWriter, req *http.Request) {
 
 }
 
