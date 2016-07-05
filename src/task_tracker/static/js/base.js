@@ -63,19 +63,26 @@ $(document).ready(function() {
       renderTasks();
       enableTasks();
     }).fail(function(jq, status, error) {
-      console.log('Failed to get tasks', status, error);
+      if (jq.status === 403) {
+        logout();
+      } else {
+        console.log("failed to get tasks", status, error);
+      }
     });
     $.ajax("/api/goals").done(function(goals) {
       goals_ = goals;
       renderGoals();
       enableGoals();
     }).fail(function(jq, status, error) {
-      console.log('Failed to get goals', status, error);
+      if (jq.status === 403) {
+        logout();
+      } else {
+        console.log("failed to get goals", status, error);
+      }
     });
 
     $('#logout').click(function(e) {
       e.preventDefault();
-      console.log('Logging out');
       logout();
     });
   }
@@ -90,7 +97,6 @@ $(document).ready(function() {
     $('#task-list').empty();
     auth.signOut();
     Cookies.remove('_s');
-    //showLogin();
   }
 
   function enableTasks() {
@@ -112,7 +118,6 @@ $(document).ready(function() {
   var addTask = function(task_key, task) {
     var li = $('<li class="task list-group-item" id="' + task_key + '">' + task['Name'] + '</li>');
     $('#task-list').append(li);
-    //var option = $('<option value="' + task_key + '">' + task['Name'] + '</option>');
     var option = $('<li><a href="#" task_key="' + task_key + '">' + task['Name'] + '</a></li>');
     $('#task-select').append(option);
   };
@@ -150,7 +155,9 @@ $(document).ready(function() {
     var percent_progress = Math.floor(((progress_count / frequency) * 100) + 0.5);
     var total = goal['Aggregations'].length;
     var completed = 0;
-    for (var agg in goal['Aggregations']) {
+    var agg_array = goal['Aggregations'];
+    for (var i = 0; i < agg_array.length; ++i) {
+      var agg = agg_array[i];
       if (agg['Success']) {
         completed++;
       }
@@ -224,6 +231,12 @@ $(document).ready(function() {
       addGoal(goal_id, goal);
       // TODO: reset form
       enableGoals();
+    }).fail(function(jq, status, error) {
+      if (jq.status === 403) {
+        logout();
+      } else {
+        console.log("failed", status, error);
+      }
     });
   });
 
@@ -263,7 +276,11 @@ $(document).ready(function() {
       $('#task-name').val('');
       enableTasks();
     }).fail(function(jq, status, error) {
-      console.log("failed", status, error);
+      if (jq.status === 403) {
+        logout();
+      } else {
+        console.log("failed", status, error);
+      }
     });
   });
 
@@ -281,10 +298,13 @@ $(document).ready(function() {
       })
     }).done(function() {
       goals_[goal_id]['Times'].push(epoch);
-      //btn.prop('disabled', false);
       refreshGoal(goal_id, goals_[goal_id]);
     }).fail(function(jq, status, error) {
-      console.log('Failed to record progress', status, error);
+      if (jq.status === 403) {
+        logout();
+      } else {
+        console.log('Failed to record progress', status, error);
+      }
       btn.prop('disabled', false);
     });
   });

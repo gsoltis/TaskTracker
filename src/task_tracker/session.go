@@ -80,15 +80,15 @@ func NewSession(token *jwt.Token, w http.ResponseWriter, req *http.Request) (*se
 	}
 }
 
-func UserForRequest(req *http.Request) (*TaskTrackerUser, error) {
+func UserForRequest(req *http.Request) *TaskTrackerUser {
 	session, err := cookieStore.Get(req, sessionName)
 	if err != nil {
-		return nil, err
+		return nil
 	}
 	val := session.Values[userKey]
 	user, ok := val.(*TaskTrackerUser)
 	if !ok {
-		return nil, nil
+		return nil
 	}
-	return user, nil
+	return user
 }

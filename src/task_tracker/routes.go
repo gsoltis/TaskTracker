@@ -27,12 +27,10 @@ func init() {
 	r.HandleFunc("/api/goals", getGoals).Methods("GET")
 	r.HandleFunc("/api/goals", addGoal).Methods("POST")
 	AddCronRoutes(r.PathPrefix("/cron").Subrouter())
-	//r.HandleFunc("/", root)
 	http.Handle("/", r)
 }
 
 func warmup(w http.ResponseWriter, req *http.Request) {
-	fmt.Printf("HAndling startup")
 	err := InitKeyCache(appengine.NewContext(req))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -66,11 +64,8 @@ func InternalServerError(w http.ResponseWriter, req *http.Request, err error) {
 }
 
 func RequireAuth(w http.ResponseWriter, req *http.Request) *TaskTrackerUser {
-	user, err := UserForRequest(req)
-	if err != nil {
-		InternalServerError(w, req, err)
-		return nil
-	} else if user == nil {
+	user := UserForRequest(req)
+	if user == nil {
 		http.Error(w, "", http.StatusForbidden)
 		return nil
 	} else {

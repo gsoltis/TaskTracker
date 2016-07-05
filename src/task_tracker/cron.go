@@ -15,15 +15,18 @@ func AddCronRoutes(r *mux.Router) {
 	r.HandleFunc("/resetTestData", resetTestData)
 }
 
-var defaultTasks = [3]Task{Task{"Walk"}, Task{"Run"}, Task{"Drink Water"}}
+var defaultTasks = []Task{Task{"Walk"}, Task{"Run"}, Task{"Drink Water"}}
 
 func resetTasksForUser(ctx appengine.Context, user_key *datastore.Key) ([]*datastore.Key, error) {
 	task_keys, err:= datastore.NewQuery("Task").Ancestor(user_key).KeysOnly().GetAll(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
-	datastore.DeleteMulti(ctx, task_keys)
-	task_keys_stub := [3]*datastore.Key{
+	err = datastore.DeleteMulti(ctx, task_keys)
+	if err != nil {
+		return nil, err
+	}
+	task_keys_stub := []*datastore.Key{
 		datastore.NewIncompleteKey(ctx, "Task", user_key),
 		datastore.NewIncompleteKey(ctx, "Task", user_key),
 		datastore.NewIncompleteKey(ctx, "Task", user_key),
@@ -35,19 +38,190 @@ func resetTasksForUser(ctx appengine.Context, user_key *datastore.Key) ([]*datas
 	return new_task_keys, nil
 }
 
-func resetGoalsForUser(ctx appengine.Context, user_key *datastore.Key, task_keys []*datastore.Key) ([]*datastore.Key, error) {
-
+func deleteProgressForGoal(wg *sync.WaitGroup, ctx appengine.Context, goal_key *datastore.Key) {
+	defer wg.Done()
+	progress_keys, err := datastore.NewQuery("Progress").Ancestor(goal_key).KeysOnly().GetAll(ctx, nil)
+	if err != nil {
+		ctx.Errorf("Failed to fetch progress for %v: %v", goal_key, err)
+		return
+	}
+	err = datastore.DeleteMulti(ctx, progress_keys)
+	if err != nil {
+		ctx.Errorf("Failed to delete progress %v: %v", progress_keys, err)
+		return
+	}
 }
 
-func resetUser(wg sync.WaitGroup, ctx appengine.Context, user_key *datastore.Key) {
-	//task_keys, err := resetTasksForUser(user_key)
-	//goal_keys, err := resetGoalsForUser(user_key, task_keys)
-	//resetProgressForUser(user_key, goal_keys)
-	wg.Done()
+func deleteAggregationsForGoal(wg *sync.WaitGroup, ctx appengine.Context, goal_key *datastore.Key) {
+	defer wg.Done()
+	progress_keys, err := datastore.NewQuery("Aggregation").Ancestor(goal_key).KeysOnly().GetAll(ctx, nil)
+	if err != nil {
+		ctx.Errorf("Failed to fetch aggregation for %v: %v", goal_key, err)
+		return
+	}
+	err = datastore.DeleteMulti(ctx, progress_keys)
+	if err != nil {
+		ctx.Errorf("Failed to delete aggregation %v: %v", progress_keys, err)
+		return
+	}
+}
+
+func resetGoalsForUser(ctx appengine.Context, user_key *datastore.Key, task_keys []*datastore.Key) ([]*datastore.Key, error) {
+	goal_keys, err := datastore.NewQuery("Goal").Ancestor(user_key).KeysOnly().GetAll(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	var pg sync.WaitGroup
+	for _, goal_key := range goal_keys {
+		pg.Add(1)
+		go deleteProgressForGoal(&pg, ctx, goal_key)
+		pg.Add(1)
+		go deleteAggregationsForGoal(&pg, ctx, goal_key)
+	}
+	pg.Wait()
+	err = datastore.DeleteMulti(ctx, goal_keys)
+	if err != nil {
+		return nil, err
+	}
+	goal_keys_stub := []*datastore.Key{
+		datastore.NewIncompleteKey(ctx, "Goal", user_key),
+		datastore.NewIncompleteKey(ctx, "Goal", user_key),
+		datastore.NewIncompleteKey(ctx, "Goal", user_key),
+	}
+	goals := []Goal{
+		Goal{
+			Task: task_keys[0],
+			Period: Day,
+			Frequency: 2,
+		},
+		Goal{
+			Task: task_keys[1],
+			Period: Week,
+			Frequency: 4,
+		},
+		Goal{
+			Task: task_keys[2],
+			Period: Day,
+			Frequency: 5,
+		},
+	}
+	new_goal_keys, err := datastore.PutMulti(ctx, goal_keys_stub, goals)
+	if err != nil {
+		return nil, err
+	}
+	return new_goal_keys, nil
+}
+
+func progress(t time.Time) *Progress {
+	return &Progress{
+		Reported: t,
+		Aggregated: false,
+	}
+}
+
+func progress_key(ctx appengine.Context, goal_key *datastore.Key) *datastore.Key {
+	return datastore.NewIncompleteKey(ctx, "Progress", goal_key)
+}
+
+func resetProgressForUser(ctx appengine.Context, user_key *datastore.Key, goal_keys []*datastore.Key) error {
+	now := time.Now()
+	yesterday := now.Add(-24 * time.Hour)
+	two_days_ago := yesterday.Add(-24 * time.Hour)
+
+	walk_progress := []*Progress{
+		progress(two_days_ago), progress(two_days_ago),
+		progress(yesterday),
+		progress(now),
+	}
+	walk_progress_key_stubs := []*datastore.Key{
+		progress_key(ctx, goal_keys[0]),
+		progress_key(ctx, goal_keys[0]),
+		progress_key(ctx, goal_keys[0]),
+		progress_key(ctx, goal_keys[0]),
+	}
+	_, err := datastore.PutMulti(ctx, walk_progress_key_stubs, walk_progress)
+	if err != nil {
+		return err
+	}
+
+	run_progress := []*Progress{progress(two_days_ago), progress(yesterday)}
+	run_progress_key_stubs := []*datastore.Key{
+		progress_key(ctx, goal_keys[1]),
+		progress_key(ctx, goal_keys[1]),
+	}
+	_, err = datastore.PutMulti(ctx, run_progress_key_stubs, run_progress)
+	if err != nil {
+		return err
+	}
+
+	water_progress := []*Progress{
+		progress(two_days_ago), progress(two_days_ago), progress(two_days_ago), progress(two_days_ago),
+		progress(two_days_ago), progress(two_days_ago), progress(two_days_ago),
+		progress(yesterday), progress(yesterday), progress(yesterday), progress(yesterday),
+		progress(yesterday), progress(yesterday), progress(yesterday),
+		progress(now), progress(now), progress(now),
+	}
+	water_progress_key_stubs := []*datastore.Key{
+		progress_key(ctx, goal_keys[2]),
+		progress_key(ctx, goal_keys[2]),
+		progress_key(ctx, goal_keys[2]),
+		progress_key(ctx, goal_keys[2]),
+		progress_key(ctx, goal_keys[2]),
+		progress_key(ctx, goal_keys[2]),
+		progress_key(ctx, goal_keys[2]),
+		progress_key(ctx, goal_keys[2]),
+		progress_key(ctx, goal_keys[2]),
+		progress_key(ctx, goal_keys[2]),
+		progress_key(ctx, goal_keys[2]),
+		progress_key(ctx, goal_keys[2]),
+		progress_key(ctx, goal_keys[2]),
+		progress_key(ctx, goal_keys[2]),
+		progress_key(ctx, goal_keys[2]),
+		progress_key(ctx, goal_keys[2]),
+		progress_key(ctx, goal_keys[2]),
+	}
+	_, err = datastore.PutMulti(ctx, water_progress_key_stubs, water_progress)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func resetUser(wg *sync.WaitGroup, ctx appengine.Context, user_key *datastore.Key) {
+	defer wg.Done()
+	task_keys, err := resetTasksForUser(ctx, user_key)
+	if err != nil {
+		ctx.Errorf("Task reset failed for %v: %v", user_key, err)
+		return
+	}
+	goal_keys, err := resetGoalsForUser(ctx, user_key, task_keys)
+	if err != nil {
+		ctx.Errorf("Goal reset failed for %v: %v", user_key, err)
+		return
+	}
+	err = resetProgressForUser(ctx, user_key, goal_keys)
+	if err != nil {
+		ctx.Errorf("Failed to reset progress for %v: %v", user_key, err)
+	}
 }
 
 func resetTestData(w http.ResponseWriter, req *http.Request) {
-
+	ctx := appengine.NewContext(req)
+	var wg sync.WaitGroup
+	users_query := datastore.NewQuery("User").KeysOnly()
+	users_iter := users_query.Run(ctx)
+	for {
+		user_key, err := users_iter.Next(nil)
+		if err == datastore.Done {
+			break
+		} else if err != nil {
+			ctx.Errorf("Failed to get key: %v, stopping iteration", err)
+			break
+		}
+		wg.Add(1)
+		go resetUser(&wg, ctx, user_key)
+	}
+	wg.Wait()
 }
 
 func aggregateGoal(wg *sync.WaitGroup, ctx appengine.Context, goal_key_string string, progress []*ProgressEntity) {

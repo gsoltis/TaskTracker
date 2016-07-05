@@ -82,7 +82,7 @@ func (p Period) addPeriod(from time.Time) time.Time {
 	return from
 }
 
-func aggregateFromTime(period_start time.Time, end_time time.Time, reports []*ProgressEntity) (*Aggregation, []*ProgressEntity, []*ProgressEntity) {
+func aggregateFromTime(ctx appengine.Context, period_start time.Time, end_time time.Time, reports []*ProgressEntity) (*Aggregation, []*ProgressEntity, []*ProgressEntity) {
 	found_reports := 0
 	first_in_next_period := -1
 	in_range := func(t time.Time) bool {
@@ -94,6 +94,7 @@ func aggregateFromTime(period_start time.Time, end_time time.Time, reports []*Pr
 			found_reports += 1
 			processed = append(processed, report_entity)
 		} else {
+			ctx.Debugf("Out of range: %v (%v %v)", report_entity.Report.Reported, period_start, end_time)
 			first_in_next_period = i
 			break
 		}
@@ -106,12 +107,16 @@ func aggregateFromTime(period_start time.Time, end_time time.Time, reports []*Pr
 		}
 		var remaining []*ProgressEntity
 		if first_in_next_period == -1 {
+			ctx.Debugf("Returning empty")
 			remaining = make([]*ProgressEntity, 0)
 		} else {
 			remaining = reports[first_in_next_period:]
+			ctx.Debugf("Returning from %v (%v)", first_in_next_period, len(remaining))
 		}
 		return agg, processed, remaining
 	} else {
+		ctx.Debugf("Found nothing between %v and %v. First: %v",
+			period_start, end_time, reports[0].Report.Reported)
 		return nil, nil, reports
 	}
 }
@@ -129,17 +134,20 @@ func GetAggregations(ctx appengine.Context, last_aggregation *Aggregation, perio
 	aggregations := make([]*Aggregation, 0)
 	aggregated_reports := make([]*ProgressEntity, 0)
 	now := time.Now()
+	ctx.Debugf("Starting with %v", last_agg_time)
+	ctx.Debugf("Now? %v", now)
+	count := 0
 	for {
 		last_agg_time = period.toPeriodStart(last_agg_time)
 		end_time := period.addPeriod(last_agg_time)
 		from := last_agg_time
 		to := end_time
 		elapsed := period.hasElapsedSince(from, to)
-		ctx.Debugf("Period elapsed from %v to %v? %v", from, to, elapsed)
+		ctx.Debugf("Period elapsed from %v to %v? %v (%v)", from, to, elapsed, count)
 		if !period.hasElapsedSince(last_agg_time, now) {
 			break
 		}
-		aggregation, processed_reports, remaining_reports := aggregateFromTime(last_agg_time, end_time, progress)
+		aggregation, processed_reports, remaining_reports := aggregateFromTime(ctx, last_agg_time, end_time, progress)
 		if aggregation != nil {
 			aggregation.Recorded = now
 			aggregation.Success = aggregation.Count >= frequency
@@ -148,8 +156,17 @@ func GetAggregations(ctx appengine.Context, last_aggregation *Aggregation, perio
 		}
 		if len(remaining_reports) < 1 {
 			break
+		} else {
+			ctx.Debugf("Remianing reports: %v", len(remaining_reports))
 		}
+		ctx.Debugf("Next remaining report: %v", remaining_reports[0].Report)
 		last_agg_time = remaining_reports[0].Report.Reported
+		ctx.Debugf("Last agg time? %v", last_agg_time)
+		progress = remaining_reports
+		count = count + 1
+		//if count == 3 {
+		//	break
+		//}
 	}
 	results := &AggregationResults{aggregations, aggregated_reports}
 	ctx.Debugf("Results: %v", results)
